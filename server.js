@@ -47,17 +47,14 @@ var userSubscriptions = new HashMap();
 var roomIndex = 0;
 
 io.on("connection", function(socket){
-	console.log("New connection");
-	console.log(socket.conn.transport.name);
+	console.log("New connection | transport " + socket.conn.transport.name);
 	let userID;
 	socket.leave(socket.id);
 	socket.on("disconnecting", (reason) => {
-		//TODO do nothing when server shutting down
 		leaveRoom(null, userID);
 		sockets.delete(userID);
 		userSubscriptions.delete(socket);
-		console.log(reason);
-		console.log(userID + " disconnected");
+		console.log(userID + " disconnected | reason " + reason);
 		dbConnectionPool.query("SELECT users.id FROM users \
 		INNER JOIN friends ON \
 		friends.userid=? AND users.id=friends.friendid \
@@ -76,7 +73,7 @@ io.on("connection", function(socket){
 	socket.on("my_user", (data) => {
 		userID = data;
 		sockets.set(userID, socket);
-		console.log(userID + " connected");
+		console.log("User " + userID + " authenticated");
 		dbConnectionPool.query("SELECT id, fromid, type from invites \
 		WHERE toid=? ORDER BY id DESC", [userID],
 			function (error, results, fields) {
@@ -127,7 +124,7 @@ io.on("connection", function(socket){
 			if (results === undefined || results.length == 0)
 				return;
 			userID = results.insertId;
-			console.log("New user " + userID + " connected");
+			console.log("New user " + userID + " authenticated");
 			sockets.set(userID, socket);
 			socket.emit("new", userID);
 		});
