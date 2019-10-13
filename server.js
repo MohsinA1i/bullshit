@@ -48,14 +48,15 @@ var roomIndex = 0;
 
 io.on("connection", function(socket){
 	console.log("New connection");
+	console.log(socket.conn.transport.name);
 	let userID;
 	socket.leave(socket.id);
 	socket.on("disconnecting", (reason) => {
 		//TODO do nothing when server shutting down
 		leaveRoom(null, userID);
 		sockets.delete(userID);
-		console.log(reason);
 		userSubscriptions.delete(socket);
+		console.log(reason);
 		console.log(userID + " disconnected");
 		dbConnectionPool.query("SELECT users.id FROM users \
 		INNER JOIN friends ON \
