@@ -71,7 +71,7 @@ io.on("connection", function(socket){
 		);
 	});
 	socket.on("my_user", (data) => {
-		if (sockets.has(userID))
+		if (sockets.has(data))
 			socket.disconnect(true);
 		userID = data;
 		sockets.set(userID, socket);
