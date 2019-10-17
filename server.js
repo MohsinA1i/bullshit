@@ -51,10 +51,6 @@ io.on("connection", function(socket){
 	let userID;
 	socket.leave(socket.id);
 	socket.on("disconnecting", (reason) => {
-		leaveRoom(null, userID);
-		sockets.delete(userID);
-		userSubscriptions.delete(socket);
-		console.log(userID + " disconnected | reason " + reason);
 		dbConnectionPool.query("SELECT users.id FROM users \
 		INNER JOIN friends ON \
 		friends.userid=? AND users.id=friends.friendid \
@@ -69,6 +65,10 @@ io.on("connection", function(socket){
 				}
 			}
 		);
+		leaveRoom(null, userID);
+		userSubscriptions.delete(socket);
+		sockets.delete(userID);
+		console.log(userID + " disconnected | reason " + reason);
 	});
 	socket.on("my_user", (data) => {
 		if (sockets.has(data))
