@@ -51,7 +51,7 @@ io.on("connection", function(socket) {
 		socket.emit("update");
 		return;
 	}
-	let userID = socket.handshake.query.id;
+	let userID = parseInt(socket.handshake.query.id);
 	if (userID != null) {
 		if (sockets.has(userID))
 			socket.disconnect(true);
