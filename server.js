@@ -2,8 +2,8 @@ var express = require('express');
 var app = express();
 var server = require('http').createServer(app);
 var io = require('socket.io')(server, {
-	pingInterval: 5000,
-	pingTimeout: 5000,
+	pingInterval: 10000,
+	pingTimeout: 10000,
 	cookie: false
 });
 var port = process.env.PORT || 80;
@@ -47,35 +47,13 @@ var userSubscriptions = new HashMap();
 var roomIndex = 0;
 
 io.on("connection", function(socket){
-	console.log("New connection | transport " + socket.conn.transport.name);
-	let userID;
 	socket.leave(socket.id);
-	socket.on("disconnecting", (reason) => {
-		dbConnectionPool.query("SELECT users.id FROM users \
-		INNER JOIN friends ON \
-		friends.userid=? AND users.id=friends.friendid \
-		OR friends.friendid=? AND users.id=friends.userid", [userID, userID],
-			function (error, results, fields) {
-				if (results === undefined || results.length == 0)
-					return;
-				for (i = 0; i < results.length; i++) {
-					let friendSocket = sockets.get(results[i].id);
-					if (friendSocket != null)
-						friendSocket.emit("friend", [0, userID, 0]);
-				}
-			}
-		);
-		leaveRoom(null, userID);
-		userSubscriptions.delete(socket);
-		sockets.delete(userID);
-		console.log(userID + " disconnected | reason " + reason);
-	});
-	socket.on("my_user", (data) => {
-		if (sockets.has(data))
+	let userID = socket.handshake.query.id;
+	if (userID != null) {
+		if (sockets.has(userID))
 			socket.disconnect(true);
-		userID = data;
+		console.log(userID + " connected | transport " + socket.conn.transport.name);
 		sockets.set(userID, socket);
-		console.log("User " + userID + " authenticated");
 		dbConnectionPool.query("SELECT id, fromid, type from invites \
 		WHERE toid=? ORDER BY id DESC", [userID],
 			function (error, results, fields) {
@@ -119,6 +97,27 @@ io.on("connection", function(socket){
 				socket.binary(true).emit("my_user", [results[0].name, thumbnail, image]);
 			}
 		);
+	}
+	
+	socket.on("disconnecting", (reason) => {
+		dbConnectionPool.query("SELECT users.id FROM users \
+		INNER JOIN friends ON \
+		friends.userid=? AND users.id=friends.friendid \
+		OR friends.friendid=? AND users.id=friends.userid", [userID, userID],
+			function (error, results, fields) {
+				if (results === undefined || results.length == 0)
+					return;
+				for (i = 0; i < results.length; i++) {
+					let friendSocket = sockets.get(results[i].id);
+					if (friendSocket != null)
+						friendSocket.emit("friend", [0, userID, 0]);
+				}
+			}
+		);
+		leaveRoom(null, userID);
+		userSubscriptions.delete(socket);
+		sockets.delete(userID);
+		console.log(userID + " disconnected | reason " + reason);
 	});
 	socket.on("new", () => {
 		dbConnectionPool.query("INSERT INTO users VALUES (DEFAULT, DEFAULT)",
@@ -126,9 +125,9 @@ io.on("connection", function(socket){
 			if (results === undefined || results.length == 0)
 				return;
 			userID = results.insertId;
-			console.log("New user " + userID + " authenticated");
 			sockets.set(userID, socket);
 			socket.emit("new", userID);
+			console.log(userID + " registered | transport " + socket.conn.transport.name);
 		});
 	});
 	socket.on("name", (data) => {
