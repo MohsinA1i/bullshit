@@ -46,8 +46,11 @@ var rooms = new HashMap(); // userID : room
 var userSubscriptions = new HashMap();
 var roomIndex = 0;
 
-io.on("connection", function(socket){
-	socket.leave(socket.id);
+io.on("connection", function(socket) {
+	if (socket.handshake.query.ver != "0.2") {
+		socket.emit("update");
+		return;
+	}
 	let userID = socket.handshake.query.id;
 	if (userID != null) {
 		if (sockets.has(userID))
@@ -98,7 +101,7 @@ io.on("connection", function(socket){
 			}
 		);
 	}
-	
+	socket.leave(socket.id);
 	socket.on("disconnecting", (reason) => {
 		dbConnectionPool.query("SELECT users.id FROM users \
 		INNER JOIN friends ON \
