@@ -382,7 +382,7 @@ function sendVotes(room) {
 	if (votesInfo[0] == null) duration += 3500;
 	let votedAuthors = Object.keys(votesInfo); 
 	for (i = 0; i < votedAuthors.length; i++) {
-		duration += 5500 + votesInfo[votedAuthors[i]].length * 500;
+		duration += 5000 + votesInfo[votedAuthors[i]].length * 500;
 	}
 	if (room.round != 6)
 		setTimeout(function(){sendQuestion(room)}, duration);
