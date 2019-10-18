@@ -40,6 +40,7 @@ var dbConnectionPool  = mysql.createPool({
 	database        : "bullshit"
 });
 const HashMap = require("hashmap");
+var randomWords = require('random-words');
 
 var sockets = new HashMap(); // userID : socket
 var rooms = new HashMap(); // userID : room
@@ -294,6 +295,7 @@ io.on("connection", function(socket) {
 	});
 	socket.on("answer", (data) => {
 		let room = rooms.get(userID);
+		if (room.timeout.stopped != null) return;
 		let answers = room.answers;
 		if (!answers.hasOwnProperty(userID))
 			io.in(room.gamespace).emit("got_answer", userID);
@@ -307,6 +309,7 @@ io.on("connection", function(socket) {
 	});
 	socket.on("vote", (data) => {
 		let room = rooms.get(userID);
+		if (room.timeout.stopped != null) return;
 		let votes = room.votes;
 		votes[userID] = data;
 		let voters = Object.keys(votes);
@@ -349,6 +352,7 @@ function sendQuestion(room) {
 }
 
 function sendAnswers(room) {
+	room.timeout.stopped = true;
 	let answers = room.answers;
 	let keys = Object.keys(answers);
 	let missingAnswers = room.users.length - (keys.length - 1);
@@ -359,6 +363,9 @@ function sendAnswers(room) {
 			let id = 0;
 			for (i = 0; i < results.length; i++)
 				answers[--id] = results[i].suggestion;
+			let missingAnswers = missingAnswers - results.length;
+			for (i = 0; i < missingAnswers; i++)
+				answers[--id] = randomWords();
 			io.in(room.gamespace).emit("answers", answers);
 			room.timeout = setTimeout(function(){sendVotes(room)}, 15500);
 		}
@@ -366,6 +373,7 @@ function sendAnswers(room) {
 }
 
 function sendVotes(room) {
+	room.timeout.stopped = true;
 	let votes = room.votes;
 	let voters = Object.keys(votes);
 	let votesInfo = new Object();
