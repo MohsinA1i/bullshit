@@ -295,6 +295,8 @@ io.on("connection", function(socket) {
 	socket.on("answer", (data) => {
 		let room = rooms.get(userID);
 		let answers = room.answers;
+		if (!answers.hasOwnProperty(userID))
+			io.in(room.gamespace).emit("got_answer", userID);
 		answers[userID] = data;
 		let keys = Object.keys(answers);
 		if (keys.length == room.users.length + 1) {
