@@ -47,7 +47,7 @@ var userSubscriptions = new HashMap();
 var roomIndex = 0;
 
 io.on("connection", function(socket) {
-	if (socket.handshake.query.ver != "0.2") {
+	if (socket.handshake.query.ver != "0.21") {
 		socket.emit("update");
 		return;
 	}
