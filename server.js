@@ -298,7 +298,7 @@ io.on("connection", function(socket) {
 		if (room.timeout.stopped != null) return;
 		let answers = room.answers;
 		if (!answers.hasOwnProperty(userID))
-			io.in(room.gamespace).emit("got_answer", userID);
+			io.in(room.gamespace).emit("done", userID);
 		answers[userID] = data;
 		let keys = Object.keys(answers);
 		if (keys.length == room.users.length + 1) {
@@ -311,6 +311,8 @@ io.on("connection", function(socket) {
 		let room = rooms.get(userID);
 		if (room.timeout.stopped != null) return;
 		let votes = room.votes;
+		if (!votes.hasOwnProperty(userID))
+			io.in(room.gamespace).emit("done", userID);
 		votes[userID] = data;
 		let voters = Object.keys(votes);
 		if (voters.length == room.users.length) {
@@ -363,7 +365,7 @@ function sendAnswers(room) {
 			let id = 0;
 			for (i = 0; i < results.length; i++)
 				answers[--id] = results[i].suggestion;
-			let missingAnswers = missingAnswers - results.length;
+			missingAnswers = missingAnswers - results.length;
 			for (i = 0; i < missingAnswers; i++)
 				answers[--id] = randomWords();
 			io.in(room.gamespace).emit("answers", answers);
