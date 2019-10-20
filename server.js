@@ -54,8 +54,10 @@ io.on("connection", function(socket) {
 	}
 	let userID = parseInt(socket.handshake.query.id);
 	if (userID != null) {
-		if (sockets.has(userID))
+		if (sockets.has(userID)) {
 			socket.disconnect(true);
+			return;
+		}
 		console.log(userID + " connected | transport " + socket.conn.transport.name);
 		sockets.set(userID, socket);
 		dbConnectionPool.query("SELECT id, fromid, type from invites \
