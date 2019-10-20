@@ -349,7 +349,7 @@ function sendQuestion(room) {
 			room.answers[0] = result.answer;
 			room.round++;
 			io.in(room.gamespace).emit("question", result.question);
-			room.timeout = setTimeout(function(){sendAnswers(room)}, 60500);
+			room.timeout = setTimeout(function(){sendAnswers(room)}, 50500);
 		}
 	);
 }
