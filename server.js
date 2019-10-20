@@ -48,7 +48,7 @@ var userSubscriptions = new HashMap();
 var roomIndex = 0;
 
 io.on("connection", function(socket) {
-	if (socket.handshake.query.ver != "0.22") {
+	if (socket.handshake.query.ver != "0.23") {
 		socket.emit("update");
 		return;
 	}
@@ -304,7 +304,7 @@ io.on("connection", function(socket) {
 		if (keys.length == room.users.length + 1) {
 			clearTimeout(room.timeout);
 			io.in(room.gamespace).emit("answers", answers);
-			room.timeout = setTimeout(function(){sendVotes(room)}, 15500);
+			room.timeout = setTimeout(function(){sendVotes(room)}, 30500);
 		}
 	});
 	socket.on("vote", (data) => {
@@ -329,7 +329,7 @@ function startGame(room) {
 	let userIDs = room.users;
 	for (i = 0; i < userIDs.length; i++) {
 		let userID = userIDs[i];
-		room.scores[userID] = 0;
+		room.scores[userID] = 0; //TODO keep track of score
 		let socket = sockets.get(userID);
 		socket.join(room.gamespace);
 	}
@@ -348,7 +348,7 @@ function sendQuestion(room) {
 			room.answers[0] = result.answer;
 			room.round++;
 			io.in(room.gamespace).emit("question", result.question);
-			room.timeout = setTimeout(function(){sendAnswers(room)}, 30500);
+			room.timeout = setTimeout(function(){sendAnswers(room)}, 60500);
 		}
 	);
 }
@@ -369,7 +369,7 @@ function sendAnswers(room) {
 			for (i = 0; i < missingAnswers; i++)
 				answers[--id] = randomWords();
 			io.in(room.gamespace).emit("answers", answers);
-			room.timeout = setTimeout(function(){sendVotes(room)}, 15500);
+			room.timeout = setTimeout(function(){sendVotes(room)}, 30500);
 		}
 	);
 }
