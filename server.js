@@ -50,61 +50,60 @@ var roomIndex = 0;
 io.on("connection", function(socket) {
 	if (socket.handshake.query.ver != "0.23") {
 		socket.emit("update");
+		socket.disconnect(true);
 		return;
 	}
 	let userID = parseInt(socket.handshake.query.id);
-	if (userID != null) {
-		if (sockets.has(userID)) {
-			socket.disconnect(true);
-			return;
-		}
-		console.log(userID + " connected | transport " + socket.conn.transport.name);
-		sockets.set(userID, socket);
-		dbConnectionPool.query("SELECT id, fromid, type from invites \
-		WHERE toid=? ORDER BY id DESC", [userID],
-			function (error, results, fields) {
-				if (results === undefined)
-						return;
-				let invites = [];
-				for (i = 0; i < results.length; i++) {
-					let invite = results[i];
-					invites[i] = [invite.id, invite.fromid, invite.type];
-				}
-				socket.emit("invite", invites);
-			}
-		);
-		dbConnectionPool.query("SELECT users.id FROM users \
-		INNER JOIN friends ON \
-		friends.userid=? AND users.id=friends.friendid \
-		OR friends.friendid=? AND users.id=friends.userid", [userID, userID],
-			function (error, results, fields) {
-				if (results === undefined)
-					return;
-				let friends = [];
-				for (i = 0; i < results.length; i++) {
-					let friendsUserID = results[i].id;
-					let friendsSocket = sockets.get(friendsUserID);
-					if (friendsSocket == null)
-						friends[i] = [friendsUserID, 0];
-					else {
-						friends[i] = [friendsUserID, 1];
-						friendsSocket.emit("friend", [0, userID, 1]);
-					}
-				}
-				socket.emit("friend", friends);
-			}
-		);
-		dbConnectionPool.query("SELECT name FROM users WHERE id = ?", [userID],
-			async function (error, results, fields) {
-				if (results === undefined)
-						return;
-				let image = await getFile(true, userID.toString());
-				let thumbnail = await getFile(false, userID.toString());
-				socket.binary(true).emit("my_user", [results[0].name, thumbnail, image]);
-			}
-		);
+	if (userID == null || sockets.has(userID)){
+		socket.disconnect(true);
+		return;
 	}
+	console.log(userID + " connected | transport " + socket.conn.transport.name);
 	socket.leave(socket.id);
+	sockets.set(userID, socket);
+	dbConnectionPool.query("SELECT id, fromid, type from invites \
+	WHERE toid=? ORDER BY id DESC", [userID],
+		function (error, results, fields) {
+			if (results === undefined)
+					return;
+			let invites = [];
+			for (i = 0; i < results.length; i++) {
+				let invite = results[i];
+				invites[i] = [invite.id, invite.fromid, invite.type];
+			}
+			socket.emit("invite", invites);
+		}
+	);
+	dbConnectionPool.query("SELECT users.id FROM users \
+	INNER JOIN friends ON \
+	friends.userid=? AND users.id=friends.friendid \
+	OR friends.friendid=? AND users.id=friends.userid", [userID, userID],
+		function (error, results, fields) {
+			if (results === undefined)
+				return;
+			let friends = [];
+			for (i = 0; i < results.length; i++) {
+				let friendsUserID = results[i].id;
+				let friendsSocket = sockets.get(friendsUserID);
+				if (friendsSocket == null)
+					friends[i] = [friendsUserID, 0];
+				else {
+					friends[i] = [friendsUserID, 1];
+					friendsSocket.emit("friend", [0, userID, 1]);
+				}
+			}
+			socket.emit("friend", friends);
+		}
+	);
+	dbConnectionPool.query("SELECT name FROM users WHERE id = ?", [userID],
+		async function (error, results, fields) {
+			if (results === undefined)
+					return;
+			let image = await getFile(true, userID.toString());
+			let thumbnail = await getFile(false, userID.toString());
+			socket.binary(true).emit("my_user", [results[0].name, thumbnail, image]);
+		}
+	);
 	socket.on("disconnecting", (reason) => {
 		dbConnectionPool.query("SELECT users.id FROM users \
 		INNER JOIN friends ON \
