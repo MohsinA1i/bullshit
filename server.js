@@ -55,7 +55,7 @@ io.on("connection", function(socket) {
 	let userID = parseInt(socket.handshake.query.id);
 	if (userID != null) {
 		if (sockets.has(userID)) {
-			socket.disconnect(true);
+			socket.disconnect(false);
 			return;
 		}
 		console.log(userID + " connected | transport " + socket.conn.transport.name);
