@@ -46,6 +46,7 @@ var sockets = new HashMap(); // userID : socket
 var rooms = new HashMap(); // userID : room
 var userSubscriptions = new HashMap();
 var roomIndex = 0;
+var matchMaking = [];
 
 io.on("connection", function(socket) {
 	if (socket.handshake.query.ver != "0.23") {
@@ -286,13 +287,40 @@ io.on("connection", function(socket) {
 	});
 	socket.on("start", (data) => {
 		let room = rooms.get(userID);
-		io.in(room.namespace).emit("start");
+		room.extendTimers = data[1];
+		io.in(room.namespace).emit("start", room.extendTimers);
 		room.timeout = setTimeout(function(){startGame(room)}, 5500);
 	});
-	socket.on("cancel", (data) => {
+	socket.on("cancel_start", (data) => {
 		let room = rooms.get(userID);
 		clearTimeout(room.timeout);
-		io.in(room.namespace).emit("cancel");
+		io.in(room.namespace).emit("cancel_start");
+	});
+	socket.on("match", (data) => {
+		if (matchMaking.length > 2) {
+			let room = new Object();
+			room.namespace = roomIndex++;
+			room.users = matchMaking.splice(matchMaking.length - 3, 3);
+			room.users.push(userID);
+			for (let i = 0; i < 4; i++) {
+				let otherID = room.users[i];
+				let otherSocket = sockets.get(otherID);
+				otherSocket.join(room.namespace);
+				rooms.set(otherID, room);
+			}
+			io.to(room.namespace).emit("lobby", [room.users]);
+			room.extendTimers = false;
+			io.in(room.namespace).emit("start", false);
+			room.timeout = setTimeout(function(){startGame(room)}, 5500);
+		} else 
+			matchMaking.push(userID);
+	});
+	socket.on("cancel_match", (data) => {
+		let index = matchMaking.indexOf(userID);
+		if (index != -1) {
+			matchMaking.splice(index,1);
+			socket.emit("cancel_match");
+		}
 	});
 	socket.on("answer", (data) => {
 		let room = rooms.get(userID);
@@ -305,7 +333,7 @@ io.on("connection", function(socket) {
 		if (keys.length == room.users.length + 1) {
 			clearTimeout(room.timeout);
 			io.in(room.gamespace).emit("answers", answers);
-			room.timeout = setTimeout(function(){sendVotes(room)}, 30500);
+			room.timeout = setTimeout(function(){sendVotes(room)}, room.extendTimers ? 40500 : 20500);
 		}
 	});
 	socket.on("vote", (data) => {
@@ -349,7 +377,7 @@ function sendQuestion(room) {
 			room.answers[0] = result.answer;
 			room.round++;
 			io.in(room.gamespace).emit("question", result.question);
-			room.timeout = setTimeout(function(){sendAnswers(room)}, 50500);
+			room.timeout = setTimeout(function(){sendAnswers(room)}, room.extendTimers ? 60500 : 40500);
 		}
 	);
 }
@@ -370,7 +398,7 @@ function sendAnswers(room) {
 			for (i = 0; i < missingAnswers; i++)
 				answers[--id] = randomWords();
 			io.in(room.gamespace).emit("answers", answers);
-			room.timeout = setTimeout(function(){sendVotes(room)}, 30500);
+			room.timeout = setTimeout(function(){sendVotes(room)}, room.extendTimers ? 40500 : 20500);
 		}
 	);
 }
