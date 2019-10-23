@@ -304,12 +304,12 @@ io.on("connection", function(socket) {
 		let index = matchMaking.indexOf(userID);
 		if (index != -1)
 			return;
-		if (matchMaking.length > 0) {
+		if (matchMaking.length > 2) {
 			let room = new Object();
 			room.namespace = roomIndex++;
-			room.users = matchMaking.splice(matchMaking.length - 1, 1);
+			room.users = matchMaking.splice(matchMaking.length - 3, 3);
 			room.users.push(userID);
-			for (let i = 0; i < 2; i++) {
+			for (let i = 0; i < 4; i++) {
 				let otherID = room.users[i];
 				let otherSocket = sockets.get(otherID);
 				otherSocket.join(room.namespace);
