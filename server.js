@@ -122,6 +122,8 @@ io.on("connection", function(socket) {
 		);
 		leaveRoom(null, userID);
 		userSubscriptions.delete(socket);
+		let index = matchMaking.indexOf(userID);
+		if (index != -1) matchMaking.splice(index,1);
 		sockets.delete(userID);
 		console.log(userID + " disconnected | reason " + reason);
 	});
@@ -243,7 +245,9 @@ io.on("connection", function(socket) {
 			socketTo.emit("friend", [2, userID]);
 		socket.emit("friend", [2, data]);
 	});
-	socket.on("lobby", (data) => {
+	socket.on("accept_invite", (data) => {
+		let index = matchMaking.indexOf(userID);
+		if (index != -1) matchMaking.splice(index,1);
 		socket.emit("invite", [0, data[0]]);
 		dbConnectionPool.query("DELETE FROM invites WHERE id=?",[data[0]]);
 		leaveRoom(socket, userID);
@@ -258,7 +262,7 @@ io.on("connection", function(socket) {
 				rooms.set(data[1], room);
 				rooms.set(userID, room);
 				room.users = [data[1], userID];
-				io.to(room.namespace).emit("lobby", [room.users]);
+				io.to(room.namespace).emit("lobby", [room.users, false]);
 			} else {
 				if (room.users.includes(userID))
 					return
@@ -297,23 +301,27 @@ io.on("connection", function(socket) {
 		io.in(room.namespace).emit("cancel_start");
 	});
 	socket.on("match", (data) => {
-		if (matchMaking.length > 2) {
+		let index = matchMaking.indexOf(userID);
+		if (index != -1)
+			return;
+		if (matchMaking.length > 0) {
 			let room = new Object();
 			room.namespace = roomIndex++;
-			room.users = matchMaking.splice(matchMaking.length - 3, 3);
+			room.users = matchMaking.splice(matchMaking.length - 1, 1);
 			room.users.push(userID);
-			for (let i = 0; i < 4; i++) {
+			for (let i = 0; i < 2; i++) {
 				let otherID = room.users[i];
 				let otherSocket = sockets.get(otherID);
 				otherSocket.join(room.namespace);
 				rooms.set(otherID, room);
 			}
-			io.to(room.namespace).emit("lobby", [room.users]);
+			io.to(room.namespace).emit("lobby", [room.users, true]);
 			room.extendTimers = false;
 			io.in(room.namespace).emit("start", false);
 			room.timeout = setTimeout(function(){startGame(room)}, 5500);
-		} else 
+		} else {
 			matchMaking.push(userID);
+		}
 	});
 	socket.on("cancel_match", (data) => {
 		let index = matchMaking.indexOf(userID);
@@ -330,7 +338,7 @@ io.on("connection", function(socket) {
 			io.in(room.gamespace).emit("done", userID);
 		answers[userID] = data;
 		let keys = Object.keys(answers);
-		if (keys.length == room.users.length + 1) {
+		if (keys.length == room.players.length + 1) {
 			clearTimeout(room.timeout);
 			io.in(room.gamespace).emit("answers", answers);
 			room.timeout = setTimeout(function(){sendVotes(room)}, room.extendTimers ? 40500 : 20500);
@@ -344,7 +352,7 @@ io.on("connection", function(socket) {
 			io.in(room.gamespace).emit("done", userID);
 		votes[userID] = data;
 		let voters = Object.keys(votes);
-		if (voters.length == room.users.length) {
+		if (voters.length == room.players.length) {
 			clearTimeout(room.timeout);
 			sendVotes(room);
 		}
@@ -355,9 +363,9 @@ function startGame(room) {
 	room.round = 0;
 	room.scores = new Object();
 	room.gamespace = roomIndex++;
-	let userIDs = room.users;
-	for (i = 0; i < userIDs.length; i++) {
-		let userID = userIDs[i];
+	room.players = Array.from(room.users);
+	for (i = 0; i < room.players.length; i++) {
+		let userID = room.players[i];
 		room.scores[userID] = 0; //TODO keep track of score
 		let socket = sockets.get(userID);
 		socket.join(room.gamespace);
@@ -386,7 +394,7 @@ function sendAnswers(room) {
 	room.timeout.stopped = true;
 	let answers = room.answers;
 	let keys = Object.keys(answers);
-	let missingAnswers = room.users.length - (keys.length - 1);
+	let missingAnswers = room.players.length - (keys.length - 1);
 	dbConnectionPool.query("SELECT suggestion FROM suggestions WHERE id=? ORDER BY RAND() LIMIT ?", [room.questionID, missingAnswers],
 		function (error, results, fields) {
 			if (results === undefined || results.length == 0)
@@ -419,7 +427,7 @@ function sendVotes(room) {
 		}
 	}
 	io.in(room.gamespace).emit("answers", votesInfo);
-	let duration = 4500 + room.users.length * 500;
+	let duration = 4500 + room.players.length * 500;
 	if (votesInfo[0] == null) duration += 3500;
 	let votedAuthors = Object.keys(votesInfo); 
 	for (i = 0; i < votedAuthors.length; i++) {
@@ -436,21 +444,29 @@ function leaveRoom(socket, userID){
 	rooms.delete(userID);
 	let users = room.users;
 	users.splice(users.indexOf(userID),1);
+	let players = room.players;
+	if (players != null) {
+		let index = players.indexOf(userID);
+		if (index != -1) {
+			players.splice(index, 1);
+			if (players.length == 0)
+				clearTimeout(room.timeout);
+		}
+	}
 	if (socket != null) {
 		socket.leave(room.namespace);
-		if (room.gamespace != null)
+		if (room.gamespace != null) {
 			socket.leave(room.gamespace);
+		}
 		socket.emit('lobby', []);
 	}
 	if (users.length == 1) {
-		rooms.delete(users[0]);
-		let remainingSocket = sockets.get(users[0]);
-		users = [];
-		remainingSocket.leave(room.namespace);
-		if (room.gamespace != null)
-			remainingSocket.leave(room.gamespace);
-		remainingSocket.emit('lobby', []);
-	} else
+		let remainingUserID = users[0];
+		let remainingSocket = sockets.get(remainingUserID);
+		leaveRoom(remainingSocket, remainingUserID);
+	} else if (users.length == 0)
+		delete(room);
+	else
 		io.in(room.namespace).emit('lobby', [1, userID]);
 }
 
