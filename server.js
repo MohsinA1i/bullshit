@@ -49,7 +49,7 @@ var roomIndex = 0;
 var matchMaking = [];
 
 io.on("connection", function(socket) {
-	if (socket.handshake.query.ver != "0.23") {
+	if (socket.handshake.query.ver != "0.24") {
 		socket.emit("update");
 		socket.disconnect(true);
 		return;
