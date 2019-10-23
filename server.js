@@ -304,12 +304,12 @@ io.on("connection", function(socket) {
 		let index = matchMaking.indexOf(userID);
 		if (index != -1)
 			return;
-		if (matchMaking.length > 2) {
+		if (matchMaking.length > 0) {
 			let room = new Object();
 			room.namespace = roomIndex++;
-			room.users = matchMaking.splice(matchMaking.length - 3, 3);
+			room.users = matchMaking.splice(matchMaking.length - 1, 1);
 			room.users.push(userID);
-			for (let i = 0; i < 4; i++) {
+			for (let i = 0; i < 2; i++) {
 				let otherID = room.users[i];
 				let otherSocket = sockets.get(otherID);
 				otherSocket.join(room.namespace);
@@ -321,13 +321,14 @@ io.on("connection", function(socket) {
 			room.timeout = setTimeout(function(){startGame(room)}, 5500);
 		} else {
 			matchMaking.push(userID);
+			socket.emit("match", true);
 		}
 	});
 	socket.on("cancel_match", (data) => {
 		let index = matchMaking.indexOf(userID);
 		if (index != -1) {
 			matchMaking.splice(index,1);
-			socket.emit("cancel_match");
+			socket.emit("match", false);
 		}
 	});
 	socket.on("answer", (data) => {
