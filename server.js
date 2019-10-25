@@ -263,6 +263,8 @@ io.on("connection", function(socket) {
 				rooms.set(userID, room);
 				room.users = [data[1], userID];
 				io.to(room.namespace).emit("lobby", [room.users, false]);
+				let index = matchMaking.indexOf(data[1]);
+				if (index != -1) matchMaking.splice(index,1);
 			} else {
 				if (room.users.includes(userID))
 					return
