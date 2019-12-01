@@ -50,20 +50,20 @@ IO.on("connection", async (socket) => {
 		Users.delete(User.userID)
 		console.log(User.userID + " disconnected | reason " + reason)
 	});
-	socket.on("new", async () => {
+	socket.on("new_user", async () => {
 		User.userID = DatabaseManager.createNewUser()
 		Users.set(User.userID, User)
-		socket.emit("new", User.userID)
+		socket.emit("new_user", User.userID)
 		console.log(User.userID + " registered | transport " + socket.conn.transport.name)
 	});
-	socket.on("name", (data) => {
+	socket.on("set_name", (data) => {
 		DatabaseManager.setName(User.userID, data)
 		UserSubscriptions.forEach((subscribedUsers, otherSocket) => {
 			if (subscribedUsers.includes(User.userID))
 				otherSocket.emit("name", [User.userID, data])
 		})
 	});
-	socket.on("image", async (data) => {
+	socket.on("set_image", async (data) => {
 		let thumbnailList = data[1]
 		let imageBuffer = new Uint8Array(data[0])
 		let thumbnailBuffer = new Uint8Array(thumbnailList)
@@ -78,7 +78,7 @@ IO.on("connection", async (socket) => {
 		let image = await FileManager.getFile(true, data.toString())
 		socket.emit("image", [data, image])
 	});
-	socket.on("user", async (data) => {
+	socket.on("get_user", async (data) => {
 		let subscribedUsers = UserSubscriptions.get(socket)
 		if (subscribedUsers == undefined) {
 			subscribedUsers = data
@@ -131,7 +131,7 @@ IO.on("connection", async (socket) => {
 		let friend = Users.get(data)
 		if (friend)
 			friend.socket.emit("friend", [2, User.userID])
-		friend.socket.emit("friend", [2, data])
+		socket.emit("friend", [2, data])
 	});
 	socket.on("join", (data) => {
 		let inviteID = data[0]
@@ -160,7 +160,15 @@ IO.on("connection", async (socket) => {
 	});
 	socket.on("start", (data) => {
 		let players = User.room ? User.room.users : [User] 
-		if (!User.room || data[0]) {
+		let options = {
+			addStrangers : true,
+			extendTimers : false,
+		}
+		if (data) {
+			options.addStrangers = data[0]
+			options.extendTimers = data[1]
+		}
+		if (User.room == undefined || options.addStrangers) {
 			let strangers = MatchMaking.findPlayers(5 - players.length)
 			if (strangers)
 				players = players.concat(strangers)
@@ -169,7 +177,12 @@ IO.on("connection", async (socket) => {
 				return
 			}
 		}
-		new GameManager.createGame(players, data[1])
+		let game = new GameManager.createGame(players, options)
+		game.timeout = setTimeout(function () { game.startGame() }, 5500)
+	});
+	socket.on("remove_match", (data) => {
+		let players = User.room ? User.room.users : [User] 
+		MatchMaking.removeUsers(players)
 	});
 	socket.on("answer", (data) => {
 		User.game.addAnswer(User.userID, data)

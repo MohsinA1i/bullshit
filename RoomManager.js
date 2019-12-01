@@ -1,7 +1,7 @@
 let IO
 let NamespaceCounter
 
-function RoomManager(_IO, _Users, _NamespaceCounter) {
+function RoomManager(_IO, _NamespaceCounter) {
     IO = _IO
     NamespaceCounter =  _NamespaceCounter
     return RoomManager.prototype
@@ -12,9 +12,8 @@ RoomManager.prototype.returnToRoom = function(players) {
     for (let i = 0; i < players.length; i++) {
         let player = players[i]
         if (player.room) {
-            let users = rooms[player.room.namespace]
-            if (users) users.push(player)
-            else users = [player] 
+            if (rooms[player.room.namespace] == undefined)
+                rooms[player.room.namespace] = player.room.users
         } else 
             player.socket.emit("lobby", [0, []])
     }
@@ -23,7 +22,7 @@ RoomManager.prototype.returnToRoom = function(players) {
         let namespace = keys[i]
         let users = rooms[namespace]
         let userIDs = users.map((user) => user.userID)
-        IO.to(namespace).emit("lobby", [0, userIDs])
+        IO.to(namespace).emit("lobby", [0, userIDs, false])
     }
 }
 
@@ -37,7 +36,7 @@ RoomManager.prototype.createRoom = function(users) {
         user.socket.join(this.namespace)
         user.room = this
     }
-	IO.to(this.namespace).emit("lobby", [0, userIDs])
+	IO.to(this.namespace).emit("lobby", [0, userIDs, false])
 }
 
 const Room = RoomManager.prototype.createRoom
@@ -46,7 +45,7 @@ Room.prototype.add = function(user) {
     if (this.users.includes(user)) return
     this.users.push(user)
     let userIDs = this.users.map((user) => user.userID)
-    user.socket.emit("lobby", [0, userIDs])
+    user.socket.emit("lobby", [0, userIDs, false])
     IO.to(this.namespace).emit("lobby", [1, user.userID])
     user.socket.join(this.namespace)
     user.room = this  

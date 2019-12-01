@@ -5,17 +5,17 @@ let NamespaceCounter
 let DatabaseManager
 let RoomManager
 
-function GameManager(_IO, _Sockets, _NamespaceCounter, _DatabaseManager, _RoomManager) {
+function GameManager(_IO, _NamespaceCounter, _DatabaseManager, _RoomManager) {
 	IO = _IO
-	Sockets = _Sockets
 	NamespaceCounter = _NamespaceCounter
 	DatabaseManager = _DatabaseManager
 	RoomManager = _RoomManager
 	return GameManager.prototype
 }
 	
-GameManager.prototype.createGame = function(players, extendTimers) {
+GameManager.prototype.createGame = function(players, options) {
 	this.namespace = ++NamespaceCounter.count
+	console.log(this.namespace)
 	this.players = players
 	let playerIDs = []
 	for (let i = 0; i < players.length; i++) {
@@ -24,27 +24,30 @@ GameManager.prototype.createGame = function(players, extendTimers) {
 		player.socket.join(this.namespace)
 		player.game = this
 	}
-	IO.to(this.namespace).emit("lobby", [0, playerIDs])
-	this.timeout = setTimeout(this._startGame(extendTimers), 5500)
+	this.options = options
+	IO.to(this.namespace).emit("lobby", [0, playerIDs, options.addStrangers])
+	IO.to(this.namespace).emit("start", this.options.extendTimers)
+	return this
 }
 
 const Game = GameManager.prototype.createGame
 
-Game.prototype.startGame = function(extendTimers) {
-	this.extendTimers = extendTimers
+Game.prototype.startGame = function() {
 	this.scores = new Object()
 	this.round = 0
 	this.sendQuestion()
 }
 
-Game.prototype.sendQuestion = async function () {
-    let row = await DatabaseManager.getQuestion()[0]
+Game.prototype.sendQuestion = async function() {
+	let rows = await DatabaseManager.getQuestion()
+	let row = rows[0]
 	this.questionID = row.id
 	this.answers = new Object()
 	this.answers[0] = row.answer
 	this.round++
 	IO.in(this.namespace).emit("question", row.question)
-	this.timeout = setTimeout(function () { this.sendAnswers() }, this.extendTimers ? 60500 : 40500)
+	let game = this
+	this.timeout = setTimeout(function () { game.sendAnswers() }, this.options.extendTimers ? 60500 : 40500)
 }
 
 Game.prototype.addAnswer = function(userID, answer) {
@@ -57,11 +60,12 @@ Game.prototype.addAnswer = function(userID, answer) {
 		clearTimeout(this.timeout)
 		IO.in(this.namespace).emit("answers", this.answers)
 		this.votes = new Object()
-		this.timeout = setTimeout(function () { this.sendVotes() }, this.extendTimers ? 40500 : 20500)
+		let game = this
+		this.timeout = setTimeout(function () { game.sendVotes() }, this.options.extendTimers ? 40500 : 20500)
 	}
 }
 
-Game.prototype.sendAnswers = async function sendAnswers() {
+Game.prototype.sendAnswers = async function() {
 	this.timeout.elapsed = true
 
 	let keys = Object.keys(this.answers)
@@ -76,7 +80,10 @@ Game.prototype.sendAnswers = async function sendAnswers() {
 		this.answers[--id] = RandomWords()
 
 	IO.in(this.namespace).emit("answers", this.answers)
-	this.timeout = setTimeout(function () { this.sendVotes() }, this.extendTimers ? 40500 : 20500)
+
+	this.votes = new Object()
+	let game = this
+	this.timeout = setTimeout(function () { game.sendVotes() }, this.options.extendTimers ? 40500 : 20500)
 }
 
 Game.prototype.addVote = function(userID, authorID) {
@@ -115,11 +122,12 @@ Game.prototype.sendVotes = function() {
 	for (let i = 0; i < votedAuthors.length; i++)
 		duration += 5000 + authorVoters[votedAuthors[i]].length * 500
 
-	if (this.round == 1) {
+	let game = this
+	if (this.round == 6) {
 		duration += 10000
-		setTimeout(function () { this.gameFinished() }, duration)
+		setTimeout(function () { game.endGame() }, duration)
 	} else
-		setTimeout(function () { this.sendQuestion() }, duration)
+		setTimeout(function () { game.sendQuestion() }, duration)
 }
 
 Game.prototype.endGame = function() {
@@ -148,3 +156,5 @@ Game.prototype.remove = function(player) {
 		RoomManager.returnToRoom(otherPlayer)
 	}
 }
+
+module.exports = GameManager

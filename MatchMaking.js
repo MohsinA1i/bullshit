@@ -45,9 +45,13 @@ exports.findPlayers = function (count) {
 }
 
 exports.addUsers = function(users) {
-	WaitingLists.get(users.length).push(users)
-	for (let i = 0; i < users.length; i ++)
-		users[i].socket.emit("match", true)
+	if (users.length == 1)
+		exports.addUser(users[0])
+	else {
+		WaitingLists.get(users.length).push(users)
+		for (let i = 0; i < users.length; i ++)
+			users[i].socket.emit("match", true)
+	}
 }
 
 exports.addUser = function(user) {
@@ -56,12 +60,16 @@ exports.addUser = function(user) {
 }
 
 exports.removeUsers = function(users) {
-	let groups = WaitingLists.get(users.length)
-	let index = groups.indexOf(users)
-	if (index != -1) {
-		groups.splice(users, 1)
-		for (let i = 0; i < users.length; i ++)
-			users[i].socket.emit("match", false)
+	if (users.length == 1) {
+		exports.removeUser(users[0])
+	} else {
+		let groups = WaitingLists.get(users.length)
+		let index = groups.indexOf(users)
+		if (index != -1) {
+			groups.splice(users, 1)
+			for (let i = 0; i < users.length; i ++)
+				users[i].socket.emit("match", false)
+		}
 	}
 }
 
