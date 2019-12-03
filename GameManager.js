@@ -123,7 +123,7 @@ Game.prototype.sendVotes = function() {
 		duration += 5000 + authorVoters[votedAuthors[i]].length * 500
 
 	let game = this
-	if (this.round == 1) {
+	if (this.round == 6) {
 		duration += 10000
 		setTimeout(function () { game.endGame() }, duration)
 	} else
