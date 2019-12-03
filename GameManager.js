@@ -15,17 +15,17 @@ function GameManager(_IO, _NamespaceCounter, _DatabaseManager, _RoomManager) {
 	
 GameManager.prototype.createGame = function(players, options) {
 	this.namespace = ++NamespaceCounter.count
-	console.log(this.namespace)
 	this.players = players
 	let playerIDs = []
 	for (let i = 0; i < players.length; i++) {
 		let player = players[i]
+		player.game = this
 		playerIDs.push(player.userID)
 		player.socket.join(this.namespace)
-		player.game = this
 	}
 	this.options = options
-	IO.to(this.namespace).emit("lobby", [0, playerIDs, options.addStrangers])
+	if (options.addStrangers)
+		IO.to(this.namespace).emit("lobby", [0, playerIDs, options.addStrangers])
 	IO.to(this.namespace).emit("start", this.options.extendTimers)
 	return this
 }
@@ -114,7 +114,7 @@ Game.prototype.sendVotes = function() {
 			votersList.push(voterID)
 		}
 	}
-    IO.in(this.namespace).emit("answers", authorVoters)
+    IO.in(this.namespace).emit("votes", authorVoters)
     
 	let duration = 4500 + this.players.length * 500
 	if (authorVoters[0] == undefined) duration += 3500
@@ -123,7 +123,7 @@ Game.prototype.sendVotes = function() {
 		duration += 5000 + authorVoters[votedAuthors[i]].length * 500
 
 	let game = this
-	if (this.round == 6) {
+	if (this.round == 1) {
 		duration += 10000
 		setTimeout(function () { game.endGame() }, duration)
 	} else
@@ -131,13 +131,15 @@ Game.prototype.sendVotes = function() {
 }
 
 Game.prototype.endGame = function() {
+	IO.in(this.namespace).emit("end")
     let players = this.players
     for (let i = 0; i < players.length; i++) {
 		let player = players[i]
 		player.game = undefined
 		player.socket.leave(this.namespace)
 	}
-	RoomManager.returnToRoom(players)
+	if (this.options.addStrangers)
+		RoomManager.returnToRoom(players)
 }
 
 Game.prototype.remove = function(player) {
@@ -145,7 +147,8 @@ Game.prototype.remove = function(player) {
 	player.socket.leave(this.namespace)
 	let players = this.players
 	players.splice(players.indexOf(player), 1)
-	RoomManager.returnToRoom(player)
+	if (this.options.addStrangers)
+		RoomManager.returnToRoom(player)
 
 	if (players.length == 1) {
 		clearTimeout(this.timeout)
@@ -153,7 +156,8 @@ Game.prototype.remove = function(player) {
 		let otherPlayer = players[0]
 		otherPlayer.game = undefined
 		otherPlayer.socket.leave(this.namespace)
-		RoomManager.returnToRoom(otherPlayer)
+		if (this.options.addStrangers)
+			RoomManager.returnToRoom(otherPlayer)
 	}
 }
 

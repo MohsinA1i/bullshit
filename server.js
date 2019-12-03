@@ -40,12 +40,14 @@ IO.on("connection", async (socket) => {
 	Users.set(User.userID, User)
 
 	socket.on("disconnecting", async (reason) => {
-		rows = await DatabaseManager.getFriends(User.userID)
+		let rows = await DatabaseManager.getFriends(User.userID)
 		for (let i = 0; i < rows.length; i++) {
 			let friend = Users.get(rows[i].id)
 			if (friend)
 				friend.socket.emit("friend", [3, User.userID, false])
 		}
+		if (User.game) User.game.remove(User)
+		if (User.room) User.room.remove(User)
 		MatchMaking.removeUser(User)
 		Users.delete(User.userID)
 		console.log(User.userID + " disconnected | reason " + reason)
@@ -143,7 +145,7 @@ IO.on("connection", async (socket) => {
 			if (User.game) User.game.remove(User)
 			if (User.room) User.room.remove(User)
 			if (otherUser.room) otherUser.room.add(User)
-			else new RoomManager.createRoom([User, otherUser])
+			else new RoomManager.createRoom([otherUser, User])
 		}
 	});
 	socket.on("leader", (data) => {
@@ -152,6 +154,7 @@ IO.on("connection", async (socket) => {
 	});
 	socket.on("kick", (data) => {
 		let user = User.room.users.find((user) => user.userID == data)
+		if (User.game) User.game.remove(user)
 		User.room.remove(user)
 	});
 	socket.on("chat", (data) => {
@@ -168,7 +171,7 @@ IO.on("connection", async (socket) => {
 			options.addStrangers = data[0]
 			options.extendTimers = data[1]
 		}
-		if (User.room == undefined || options.addStrangers) {
+		if (options.addStrangers) {
 			let strangers = MatchMaking.findPlayers(5 - players.length)
 			if (strangers)
 				players = players.concat(strangers)

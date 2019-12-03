@@ -50,13 +50,13 @@ exports.addUsers = function(users) {
 	else {
 		WaitingLists.get(users.length).push(users)
 		for (let i = 0; i < users.length; i ++)
-			users[i].socket.emit("match", true)
+			users[i].socket.emit("match")
 	}
 }
 
 exports.addUser = function(user) {
 	WaitingLists.get(1).push(user)
-	user.socket.emit("match", true)
+	user.socket.emit("match")
 }
 
 exports.removeUsers = function(users) {
@@ -68,7 +68,7 @@ exports.removeUsers = function(users) {
 		if (index != -1) {
 			groups.splice(users, 1)
 			for (let i = 0; i < users.length; i ++)
-				users[i].socket.emit("match", false)
+				users[i].socket.emit("end")
 		}
 	}
 }
@@ -78,7 +78,7 @@ exports.removeUser = function(user) {
 	let index = users.indexOf(user)
 	if (index != -1) {
 		users.splice(index, 1)
-		user.socket.emit("match", false)
+		user.socket.emit("end")
 	}
 }
 
