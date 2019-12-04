@@ -29,9 +29,15 @@ IO.on("connection", async (socket) => {
 		socket.disconnect(true)
 		return
 	}
+	let ReturningUser = true
 	let User = {socket : socket}
 	User.userID = parseInt(socket.handshake.query.id)
-	if (User.userID == undefined || Users.has(User.userID)) {
+	if (isNaN(User.userID)) {
+		ReturningUser = false
+		User.userID = await DatabaseManager.createNewUser()
+		socket.emit("id", User.userID)
+		console.log(User.userID + " registered")
+	} else if (Users.has(User.userID)) {
 		socket.disconnect(true)
 		return
 	}
@@ -51,12 +57,6 @@ IO.on("connection", async (socket) => {
 		MatchMaking.removeUser(User)
 		Users.delete(User.userID)
 		console.log(User.userID + " disconnected | reason " + reason)
-	});
-	socket.on("new_user", async () => {
-		User.userID = DatabaseManager.createNewUser()
-		Users.set(User.userID, User)
-		socket.emit("new_user", User.userID)
-		console.log(User.userID + " registered | transport " + socket.conn.transport.name)
 	});
 	socket.on("set_name", (data) => {
 		DatabaseManager.setName(User.userID, data)
@@ -162,7 +162,7 @@ IO.on("connection", async (socket) => {
 		socket.to(namespace).emit("chat", [User.userID, data])
 	});
 	socket.on("start", (data) => {
-		let players = User.room ? User.room.users : [User] 
+		let players = User.room ? User.room.users.slice() : [User] 
 		let options = {
 			addStrangers : true,
 			extendTimers : false,
@@ -194,29 +194,31 @@ IO.on("connection", async (socket) => {
 		User.game.addVote(User.userID, data)
 	});
 
-	let rows = await DatabaseManager.getInvites(User.userID)
-	let invites = []
-    for (let i = 0; i < rows.length; i++) {
-        let invite = rows[i]
-        invites[i] = [invite.id, invite.fromid, invite.type]
-    }
-	socket.emit("invite", invites)
+	if (ReturningUser) {
+		let rows = await DatabaseManager.getInvites(User.userID)
+		let invites = []
+		for (let i = 0; i < rows.length; i++) {
+			let invite = rows[i]
+			invites[i] = [invite.id, invite.fromid, invite.type]
+		}
+		socket.emit("invite", invites)
 
-	rows = await DatabaseManager.getFriends(User.userID)
-	let friends = []
-    for (let i = 0; i < rows.length; i++) {
-        let friendsUserID = rows[i].id
-        let friend = Users.get(friendsUserID)
-        friends[i] = [friendsUserID, friend != undefined]
-        if (friend)
-            friend.socket.emit("friend", [3, User.userID, true])
-    }
-	socket.emit("friend", [0, friends])
-	
-	rows = await DatabaseManager.getMyUser(User.userID)
-	let image = await FileManager.getFile(true, User.userID.toString())
-	let thumbnail = await FileManager.getFile(false, User.userID.toString())
-	socket.binary(true).emit("my_user", [rows[0].name, thumbnail, image])
+		rows = await DatabaseManager.getFriends(User.userID)
+		let friends = []
+		for (let i = 0; i < rows.length; i++) {
+			let friendsUserID = rows[i].id
+			let friend = Users.get(friendsUserID)
+			friends[i] = [friendsUserID, friend != undefined]
+			if (friend)
+				friend.socket.emit("friend", [3, User.userID, true])
+		}
+		socket.emit("friend", [0, friends])
+		
+		rows = await DatabaseManager.getMyUser(User.userID)
+		let image = await FileManager.getFile(true, User.userID.toString())
+		let thumbnail = await FileManager.getFile(false, User.userID.toString())
+		socket.binary(true).emit("my_user", [rows[0].name, thumbnail, image])
+	}
 });
 
 process.stdin.resume()//so the program will not close instantly
