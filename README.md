@@ -1,1 +1,1 @@
-Backend for Flutter game (in progress)
+Backend for Flutter Game (In Progress)
